@@ -49,8 +49,8 @@ Repository administrators can configure MCP servers by following these steps:
 
 {% data reusables.repositories.navigate-to-repo %}
 {% data reusables.repositories.sidebar-settings %}
-1. In the "Code & automation" section of the sidebar, click **{% data variables.product.prodname_copilot_short %}** then **MCP servers**.
-1. On the "Model Context Protocol (MCP)" page, add your configuration in the "MCP configuration" section.
+1. In the "Code & automation" section of the sidebar, click **{% data variables.product.prodname_copilot_short %}**, then click **Cloud Agent**.
+1. On the page that opens, add your configuration in the "Model Context Protocol (MCP)" configuration section.
 
    The following sections in this article explain how to write the JSON configuration that you need to enter here.
 
@@ -80,138 +80,37 @@ You configure MCP servers using a special JSON format. The JSON must contain an 
     ...
   }
 }
-```
+Example: Azure
+The Microsoft MCP repository includes the Azure MCP server, which allows {% data variables.product.prodname_copilot_short %} to understand your Azure-specific files and Azure resources within your subscription when making code changes.
 
-The configuration object can contain the following keys:
-
-**Required keys for local and remote MCP servers**
-* `tools` (`string[]`): The tools from the MCP server to enable. You may be able to find a list of tools in the server's documentation, or in its code. We strongly recommend that you allowlist specific read-only tools, since the agent will be able to use these tools autonomously and will not ask you for approval first. You can also enable all tools by including `*` in the array.
-* `type` (`string`): {% data variables.copilot.copilot_cloud_agent %} accepts `"local"`, `"stdio"`, `"http"`, or `"sse"`.
-
-**Local MCP specific keys**
-* `command` (`string`): Required. The command to run to start the MCP server.
-* `args` (`string[]`): Required. The arguments to pass to the `command`.
-* `env` (`object`): Optional. The environment variables to pass to the server. This object should map the name of the environment variable that should be exposed to your MCP server to one of the following:
-  * A substitution reference to a secret or variable in your {% data variables.product.prodname_copilot_short %} environment, such as `$COPILOT_MCP_API_KEY` or `${COPILOT_MCP_API_KEY}`. Referenced names must start with `COPILOT_MCP_`.
-  * A literal string value.
-
-**Remote MCP specific keys**
-* `url` (`string`): Required. The MCP server's URL.
-* `headers` (`object`): Optional. The headers to attach to requests to the server. This object should map the name of header keys to one of the following:
-  * A substitution reference to a secret or variable in your {% data variables.product.prodname_copilot_short %} environment, such as `$COPILOT_MCP_API_KEY` or `${COPILOT_MCP_API_KEY}`. Referenced names must start with `COPILOT_MCP_`.
-  * A literal string value.
-
-Note that all `string` and `string[]` fields besides `tools` and `type` support substitution with a variable or secret you have configured in your {% data variables.product.prodname_copilot_short %} environment.
-
-### Variable substitution
-
-The following syntax patterns are supported for referencing environment variables configured in your {% data variables.product.prodname_copilot_short %} environment:
-
-| Syntax      | Example                 |
-| ----------- | ------------            |
-| `$VAR`      | `$COPILOT_MCP_API_KEY`  |
-| `${VAR}`    | `${COPILOT_MCP_API_KEY}`|
-| `${VAR:-default}` | `${COPILOT_MCP_API_KEY:-fallback_value}` |
-
-## Example configurations
-
-The examples below show MCP server configurations for different providers.
-* [Sentry](#example-sentry)
-* [Notion](#example-notion)
-* [Azure](#example-azure)
-* [Cloudflare](#example-cloudflare)
-* [Azure DevOps](#example-azure-devops)
-* [Atlassian](#example-atlassian)
-
-### Example: Sentry
-
-The [Sentry MCP server](https://github.com/getsentry/sentry-mcp) gives {% data variables.product.prodname_copilot_short %} authenticated access to exceptions recorded in [Sentry](https://sentry.io).
-
-```javascript copy
-// If you copy and paste this example, you will need to remove the comments prefixed with `//`, which are not valid JSON.
-{
-  "mcpServers": {
-    "sentry": {
-      "type": "local",
-      "command": "npx",
-      // We can use the $SENTRY_HOST environment variable which is passed to
-      // the server because of the `env` value below.
-      "args": ["@sentry/mcp-server@latest", "--host=$SENTRY_HOST"],
-      "env": {
-        // We can specify an environment variable value as a string...
-        "SENTRY_HOST": "https://contoso.sentry.io",
-        // or refer to a variable or secret in your {% data variables.product.prodname_copilot_short %} environment
-        // with a name starting with `COPILOT_MCP_`
-        "SENTRY_ACCESS_TOKEN": "$COPILOT_MCP_SENTRY_ACCESS_TOKEN"
-      }
-    }
-  }
-}
-```
-
-### Example: Notion
-
-The [Notion MCP server](https://github.com/makenotion/notion-mcp-server) gives {% data variables.product.prodname_copilot_short %} authenticated access to notes and other content from [Notion](https://notion.so).
-
-```javascript copy
-// If you copy and paste this example, you will need to remove the comments prefixed with `//`, which are not valid JSON.
-{
-  "mcpServers": {
-    "notionApi": {
-      "type": "local",
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "-e",
-        // We can use the $NOTION_API_KEY environment variable which is passed to
-        // the server because of the `env` value below.
-        "OPENAPI_MCP_HEADERS={\"Authorization\": \"Bearer $NOTION_API_KEY\", \"Notion-Version\": \"2022-06-28\"}",
-       "mcp/notion"
-      ],
-      "env": {
-        // The value of the `COPILOT_MCP_NOTION_API_KEY` secret will be passed to the
-        // server command as an environment variable called `NOTION_API_KEY`
-        "NOTION_API_KEY": "$COPILOT_MCP_NOTION_API_KEY"
-      },
-      "tools": ["*"]
-    }
-  }
-}
-```
-
-### Example: Azure
-
-The [Microsoft MCP repository](https://github.com/microsoft/mcp) includes the Azure MCP server, which allows {% data variables.product.prodname_copilot_short %} to understand your Azure-specific files and Azure resources within your subscription when making code changes.
-
-To automatically configure your repository with a `copilot-setup-steps.yml` file to authenticate with Azure, plus secrets for authentication, clone the repository locally then run the [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/?ref_product=copilot&ref_type=engagement&ref_style=button)'s `azd cloud-agent config` command in the root of the repository.
+To automatically configure your repository with a copilot-setup-steps.yml file to authenticate with Azure, plus secrets for authentication, clone the repository locally then run the Azure Developer CLI's azd cloud-agent config command in the root of the repository.
 
 Once you've run the command and merged the created pull request, you can add the MCP configuration to your repository.
 
-  ```json copy
-   {
-     "mcpServers": {
-       "Azure": {
-        "type": "local",
-        "command": "npx",
-        "args": [
-          "-y",
-          "@azure/mcp@latest",
-          "server",
-          "start"
-         ],
-        "tools": ["*"]
-       }
+json
+
+
+ {
+   "mcpServers": {
+     "Azure": {
+      "type": "local",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure/mcp@latest",
+        "server",
+        "start"
+       ],
+      "tools": ["*"]
      }
    }
-   ```
+ }
+Example: Cloudflare
+The Cloudflare MCP server creates connections between your Cloudflare services, including processing documentation and data analysis.
 
-### Example: Cloudflare
+json
 
-The [Cloudflare MCP server](https://github.com/cloudflare/mcp-server-cloudflare) creates connections between your Cloudflare services, including processing documentation and data analysis.
 
-```json copy
 {
   "mcpServers": {
     "cloudflare": {
@@ -221,66 +120,71 @@ The [Cloudflare MCP server](https://github.com/cloudflare/mcp-server-cloudflare)
     }
   }
 }
-```
-
-### Example: Azure DevOps
-
-The [Azure DevOps MCP server](https://github.com/microsoft/azure-devops-mcp) creates a seamless connection between {% data variables.product.prodname_copilot_short %} and your Azure DevOps services, including work items, pipelines or documentation.
+Example: Azure DevOps
+The Azure DevOps MCP server creates a seamless connection between {% data variables.product.prodname_copilot_short %} and your Azure DevOps services, including work items, pipelines or documentation.
 
 To use the Azure DevOps MCP server with {% data variables.copilot.copilot_cloud_agent %}, you must update the repository's copilot-setup-steps.yml file to include an Azure login workflow step.
 
-1. Configure OIDC in a Microsoft Entra application, trusting {% data variables.product.github %}. See [Use the Azure Login action with OpenID Connect](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure-openid-connect).
-1. Setup access to Azure DevOps organization and projects for the application identity. See [Add organization users and manage access](https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/add-organization-users).
-1. Add a `.github/workflows/copilot-setup-steps.yml` Actions workflow file in your repository if you do not already have one.
-1. Add an Azure login step to the `copilot-setup-steps` workflow job.
+Configure OIDC in a Microsoft Entra application, trusting {% data variables.product.github %}. See Use the Azure Login action with OpenID Connect.
 
-   ```yaml copy
-   {% data reusables.actions.actions-not-certified-by-github-comment %}
-   on:
-     workflow_dispatch:
-   permissions:
-     id-token: write
-     contents: read
-   jobs:
-     copilot-setup-steps:
-       runs-on: ubuntu-latest
-       permissions:
-         id-token: write
-         contents: read
-       environment: copilot
-       steps:
-         - name: Azure login
-           uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
-           with:
-             client-id: {% raw %}${{ secrets.AZURE_CLIENT_ID }}{% endraw %}
-             tenant-id: {% raw %}${{ secrets.AZURE_TENANT_ID }}{% endraw %}
-             allow-no-subscriptions: true
-   ```
+Setup access to Azure DevOps organization and projects for the application identity. See Add organization users and manage access.
 
-   This configuration ensures the `azure/login` action is executed when {% data variables.copilot.copilot_cloud_agent %} runs.
-1. Configure secrets for your `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` as Agents secrets at either the organization or repository level. For more information, see [AUTOTITLE](/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/configure-secrets-and-variables).
-1. Configure the Azure DevOps MCP server by adding an `ado` object to your MCP configuration with the tools you want {% data variables.product.prodname_copilot_short %} to use.
+Add a .github/workflows/copilot-setup-steps.yml Actions workflow file in your repository if you do not already have one.
 
-  ```json copy
-  {
-    "mcpServers": {
-      "ado": {
-        "type": "local",
-        "command": "npx",
-        "args": ["-y", "@azure-devops/mcp", "<your-azure-devops-organization>", "-a", "azcli"],
-        "tools": ["wit_get_work_item", "wit_get_work_items_batch_by_ids", ...]
-      }
+Add an Azure login step to the copilot-setup-steps workflow job.
+
+yaml
+
+
+{% data reusables.actions.actions-not-certified-by-github-comment %}
+on:
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment: copilot
+    steps:
+      - name: Azure login
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
+        with:
+          client-id: {% raw %}${{ secrets.AZURE_CLIENT_ID }}{% endraw %}
+          tenant-id: {% raw %}${{ secrets.AZURE_TENANT_ID }}{% endraw %}
+          allow-no-subscriptions: true
+This configuration ensures the azure/login action is executed when {% data variables.copilot.copilot_cloud_agent %} runs.
+
+Configure secrets for your AZURE_CLIENT_ID and AZURE_TENANT_ID as Agents secrets at either the organization or repository level. For more information, see 
+AUTOTITLE
+.
+
+Configure the Azure DevOps MCP server by adding an ado object to your MCP configuration with the tools you want {% data variables.product.prodname_copilot_short %} to use.
+
+json
+
+
+{
+  "mcpServers": {
+    "ado": {
+      "type": "local",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "<your-azure-devops-organization>", "-a", "azcli"],
+      "tools": ["wit_get_work_item", "wit_get_work_items_batch_by_ids", ...]
     }
   }
-   ```
+}
+Example: Atlassian
+The Atlassian MCP server gives {% data variables.product.prodname_copilot_short %} authenticated access to your Atlassian apps, including Jira, Compass, and Confluence.
 
-### Example: Atlassian
+For more information about authenticating to the Atlassian MCP server using an API key, see Configuring authentication via API token in the Atlassian documentation.
 
-The [Atlassian MCP server](https://github.com/atlassian/atlassian-mcp-server) gives {% data variables.product.prodname_copilot_short %} authenticated access to your Atlassian apps, including Jira, Compass, and Confluence.
+javascript
 
-For more information about authenticating to the Atlassian MCP server using an API key, see [Configuring authentication via API token](https://support.atlassian.com/atlassian-rovo-mcp-server/docs/configuring-authentication-via-api-token/) in the Atlassian documentation.
 
-```javascript copy
 // If you copy and paste this example, you will need to remove the comments prefixed with `//`, which are not valid JSON.
 {
   "mcpServers": {
@@ -305,88 +209,87 @@ For more information about authenticating to the Atlassian MCP server using an A
     }
   }
 }
-```
-
-## Reusing your MCP configuration from {% data variables.product.prodname_vscode %}
-
+Reusing your MCP configuration from {% data variables.product.prodname_vscode %}
 If you have already configured MCP servers in {% data variables.product.prodname_vscode_shortname %}, you can leverage a similar configuration for your repository MCP settings on {% data variables.product.github %}.
 
-Depending on how {% data variables.product.prodname_vscode_shortname %} is configured, you may be able to find your MCP settings in your repository's `.vscode/mcp.json` file, or in your machine's private `settings.json` file.
+Depending on how {% data variables.product.prodname_vscode_shortname %} is configured, you may be able to find your MCP settings in your repository's .vscode/mcp.json file, or in your machine's private settings.json file.
 
 To adapt the configuration for repository MCP settings on {% data variables.product.github %}, you will need to:
 
-1. Add a `tools` key for each MCP server, specifying which tools will be available to {% data variables.product.prodname_copilot_short %}.
-1. If you've configured `inputs`, switch to using `env` directly.
-1. If you've configured an `envFile`, switch to using `env` directly.
-1. Update any references to `inputs` in your `args` configuration to refer to environment variables from `env` instead.
+Add a tools key for each MCP server, specifying which tools will be available to {% data variables.product.prodname_copilot_short %}.
+If you've configured inputs, switch to using env directly.
+If you've configured an envFile, switch to using env directly.
+Update any references to inputs in your args configuration to refer to environment variables from env instead.
+For more information on MCP in {% data variables.product.prodname_vscode_shortname %}, see the {% data variables.product.prodname_vscode_shortname %} docs.
 
-For more information on MCP in {% data variables.product.prodname_vscode_shortname %}, see the [{% data variables.product.prodname_vscode_shortname %} docs](https://code.visualstudio.com/docs/copilot/chat/mcp-servers).
-
-## Validating your MCP configuration
-
+Validating your MCP configuration
 Once you've set up your MCP configuration, you should test it to make sure it is set up correctly.
 
-### Validate with {% data variables.copilot.copilot_cloud_agent %}
+Validate with {% data variables.copilot.copilot_cloud_agent %}
+Create an issue in the repository, then assign it to {% data variables.product.prodname_copilot_short %}.
+Wait a few seconds, and {% data variables.product.prodname_copilot_short %} will leave an 👀 reaction on the issue.
+Wait a few more seconds, and {% data variables.product.prodname_copilot_short %} will create a pull request, which will appear in the issue's timeline.
+Click the created pull request in the timeline, and wait until a "Copilot started work" timeline event appears.
+Click View session to open the {% data variables.copilot.copilot_cloud_agent %} logs.
+Click the ellipsis button (...) at the top right of the log viewer, then click {% data variables.product.prodname_copilot_short %} in the sidebar.
+Click the Start MCP Servers step to expand the logs.
+If your MCP servers have been started successfully, you will see their tools listed at the bottom of the logs.
+If your MCP servers require any dependencies that are not installed on the {% data variables.product.prodname_actions %} runner by default, such as uv and pipx, or that need special setup steps, you may need to create a copilot-setup-steps.yml Actions workflow file to install them. For more information, see 
+AUTOTITLE
+.
 
-1. Create an issue in the repository, then assign it to {% data variables.product.prodname_copilot_short %}.
-1. Wait a few seconds, and {% data variables.product.prodname_copilot_short %} will leave an 👀 reaction on the issue.
-1. Wait a few more seconds, and {% data variables.product.prodname_copilot_short %} will create a pull request, which will appear in the issue's timeline.
-1. Click the created pull request in the timeline, and wait until a "Copilot started work" timeline event appears.
-1. Click **View session** to open the {% data variables.copilot.copilot_cloud_agent %} logs.
-1. Click the ellipsis button (**...**) at the top right of the log viewer, then click **{% data variables.product.prodname_copilot_short %}** in the sidebar.
-1. Click the **Start MCP Servers** step to expand the logs.
-1. If your MCP servers have been started successfully, you will see their tools listed at the bottom of the logs.
-
-If your MCP servers require any dependencies that are not installed on the {% data variables.product.prodname_actions %} runner by default, such as `uv` and `pipx`, or that need special setup steps, you may need to create a `copilot-setup-steps.yml` Actions workflow file to install them. For more information, see [AUTOTITLE](/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/customize-the-agent-environment).
-
-### Validate with {% data variables.copilot.copilot_code-review_short %}
-
-1. Open a pull request in the repository.
-1. Request a review from {% data variables.product.prodname_copilot_short %}.
-1. Open the linked review session from the pull request timeline by clicking **View session**. In the session logs, review the "Setting up environment" section to see which MCP servers and tools were started and called.
-
-## Customizing the built-in {% data variables.product.github %} MCP server
-
+Validate with {% data variables.copilot.copilot_code-review_short %}
+Open a pull request in the repository.
+Request a review from {% data variables.product.prodname_copilot_short %}.
+Open the linked review session from the pull request timeline by clicking View session. In the session logs, review the "Setting up environment" section to see which MCP servers and tools were started and called.
+Customizing the built-in {% data variables.product.github %} MCP server
 The {% data variables.product.github %} MCP server is enabled by default and connects to {% data variables.product.github %} with a specially scoped token that only has read-only access to the current repository.
 
 If you want to allow {% data variables.product.prodname_copilot_short %} to access data outside the current repository, you can give it a {% data variables.product.pat_generic %} with wider access.
 
-1. Create a {% data variables.product.pat_generic %} with the appropriate permissions. We recommend using a {% data variables.product.pat_v2 %}, where you can limit the token's access to read-only permissions on specific repositories. For more information on {% data variables.product.pat_generic_plural %}, see [AUTOTITLE](/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
-{% data reusables.repositories.navigate-to-repo %}
-{% data reusables.repositories.sidebar-settings %}
-1. In the "Code & automation" section of the sidebar, click **{% data variables.product.prodname_copilot_short %}** then **MCP servers**.
-1. Add your configuration in the "MCP configuration" section. For example, you can add the following:
+Create a {% data variables.product.pat_generic %} with the appropriate permissions. We recommend using a {% data variables.product.pat_v2 %}, where you can limit the token's access to read-only permissions on specific repositories. For more information on {% data variables.product.pat_generic_plural %}, see 
+AUTOTITLE
+. {% data reusables.repositories.navigate-to-repo %} {% data reusables.repositories.sidebar-settings %}
 
-   ```javascript copy
-    // If you copy and paste this example, you will need to remove the comments prefixed with `//`, which are not valid JSON.
-    {
-      "mcpServers": {
-        "github-mcp-server": {
-          "type": "http",
-          // Remove "/readonly" to enable wider access to all tools.
-          // Then, use the "X-MCP-Toolsets" header to specify which toolsets you'd like to include.
-          // Use the "tools" field to select individual tools from the toolsets.
-          "url": "https://api.githubcopilot.com/mcp/readonly",
-          "tools": ["*"],
-          "headers": {
-            "X-MCP-Toolsets": "repos,issues,users,pull_requests,code_security,secret_protection,actions,web_search"
-          }
-        }
-      }
-    }
-   ```
+In the "Code & automation" section of the sidebar, click {% data variables.product.prodname_copilot_short %}, then click Cloud Agent.
 
-   For more information on toolsets, refer to the [README](https://github.com/github/github-mcp-server?tab=readme-ov-file#available-toolsets) in the {% data variables.product.github %} Remote MCP Server documentation.
+Add your configuration in the "MCP configuration" section. For example, you can add the following:
 
-1. Click **Save MCP configuration**.
-1. Add an Agents secret called `COPILOT_MCP_GITHUB_PERSONAL_ACCESS_TOKEN` with your {% data variables.product.pat_generic %} as the value. You can configure this at either the organization or repository level. For more information, see [AUTOTITLE](/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/configure-secrets-and-variables).
+javascript
 
-For information on using the {% data variables.product.github %} MCP server in other environments, see [AUTOTITLE](/copilot/how-tos/provide-context/use-mcp-in-your-ide/use-the-github-mcp-server).
 
-## Disabling MCP tools for code review
+ // If you copy and paste this example, you will need to remove the comments prefixed with `//`, which are not valid JSON.
+ {
+   "mcpServers": {
+     "github-mcp-server": {
+       "type": "http",
+       // Remove "/readonly" to enable wider access to all tools.
+       // Then, use the "X-MCP-Toolsets" header to specify which toolsets you'd like to include.
+       // Use the "tools" field to select individual tools from the toolsets.
+       "url": "https://api.githubcopilot.com/mcp/readonly",
+       "tools": ["*"],
+       "headers": {
+         "X-MCP-Toolsets": "repos,issues,users,pull_requests,code_security,secret_protection,actions,web_search"
+       }
+     }
+   }
+ }
+For more information on toolsets, refer to the README in the {% data variables.product.github %} Remote MCP Server documentation.
 
-> [!NOTE]
-> Support for agent skills and MCP servers with {% data variables.copilot.copilot_code-review_short %} is in {% data variables.release-phases.public_preview %} and subject to change.
+Click Save MCP configuration.
+
+Add an Agents secret called COPILOT_MCP_GITHUB_PERSONAL_ACCESS_TOKEN with your {% data variables.product.pat_generic %} as the value. You can configure this at either the organization or repository level. For more information, see 
+AUTOTITLE
+.
+
+For information on using the {% data variables.product.github %} MCP server in other environments, see 
+AUTOTITLE
+.
+
+Disabling MCP tools for code review
+NOTE
+
+Support for agent skills and MCP servers with {% data variables.copilot.copilot_code-review_short %} is in {% data variables.release-phases.public_preview %} and subject to change.
 
 In repository settings, use of MCP tools by {% data variables.copilot.copilot_code-review_short %} is enabled by default.
 
@@ -394,15 +297,103 @@ Disable this setting if you want the configured MCP servers available only for {
 
 If you disable this setting, {% data variables.copilot.copilot_code-review_short %} won't call MCP tools for pull request reviews in that repository, including tools from the default {% data variables.product.github %} and Playwright MCP servers.
 
-{% data reusables.repositories.navigate-to-repo %}
-{% data reusables.repositories.sidebar-settings %}
-1. In the "Code & automation" section of the sidebar, click **{% data variables.product.prodname_copilot_short %}** then **Code review**.
-1. Click the **Allow Copilot to use MCP tools when reviewing pull requests** toggle to disable the setting.
+{% data reusables.repositories.navigate-to-repo %} {% data reusables.repositories.sidebar-settings %}
 
-## Next steps
-
-* [AUTOTITLE](/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers)
-* [AUTOTITLE](/copilot/how-tos/use-copilot-agents/request-a-code-review/use-code-review)
-* [AUTOTITLE](/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/create-custom-agents)
-* [AUTOTITLE](/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/customize-the-agent-environment)
-* [AUTOTITLE](/copilot/how-tos/provide-context/use-mcp-in-your-ide/extend-copilot-chat-with-mcp)
+In the "Code & automation" section of the sidebar, click {% data variables.product.prodname_copilot_short %} then Code review.
+Click the Allow Copilot to use MCP tools when reviewing pull requests toggle to disable the setting.
+Next steps
+AUTOTITLE
+AUTOTITLE
+AUTOTITLE
+AUTOTITLE
+AUTOTITLE
+Sources
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
+github.com
